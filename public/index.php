@@ -8,6 +8,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 $_SERVER['SCRIPT_FILENAME'] = __FILE__;
 
+$_SERVER['HTTP_X_FORWARDED_PROTO'] = "https";
+
 require_once __DIR__ . '/../vendor/autoload_runtime.php';
 
 if (!file_exists(__DIR__ . '/../.env') && !file_exists(__DIR__ . '/../.env.dist') && !file_exists(__DIR__ . '/../.env.local.php')) {
