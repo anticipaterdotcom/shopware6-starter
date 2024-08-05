@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 $_SERVER['SCRIPT_FILENAME'] = __FILE__;
 
-$_SERVER['HTTP_X_FORWARDED_PROTO'] = "https";
+$_SERVER['HTTPS']='on';
 
 require_once __DIR__ . '/../vendor/autoload_runtime.php';
 
