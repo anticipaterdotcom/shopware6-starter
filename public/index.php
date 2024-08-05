@@ -1,57 +1,49 @@
 <?php declare(strict_types=1);
 
-use Shopware\Development\HttpKernel;
-use Symfony\Component\Dotenv\Dotenv;
-use Symfony\Component\ErrorHandler\Debug;
-use Symfony\Component\HttpFoundation\Request;
+use Shopware\Core\DevOps\Environment\EnvironmentHelper;
+use Shopware\Core\Framework\Plugin\KernelPluginLoader\ComposerPluginLoader;
+use Shopware\Core\Installer\InstallerKernel;
+use Shopware\Core\Framework\Adapter\Kernel\KernelFactory;
+use Symfony\Component\HttpFoundation\Response;
 
-if (\PHP_VERSION_ID < 70400) {
-    header('Content-type: text/html; charset=utf-8', true, 503);
+$_SERVER['SCRIPT_FILENAME'] = __FILE__;
 
-    echo '<h2>Error</h2>';
-    echo 'Your server is running PHP version ' . \PHP_VERSION . ' but Shopware 6 requires at least PHP 7.4.0';
-    exit(1);
+require_once __DIR__ . '/../vendor/autoload_runtime.php';
+
+if (!file_exists(__DIR__ . '/../.env') && !file_exists(__DIR__ . '/../.env.dist') && !file_exists(__DIR__ . '/../.env.local.php')) {
+    $_SERVER['APP_RUNTIME_OPTIONS']['disable_dotenv'] = true;
 }
 
-$classLoader = require __DIR__ . '/../vendor/autoload.php';
+return function (array $context) {
+    $classLoader = require __DIR__ . '/../vendor/autoload.php';
 
-// The check is to ensure we don't use .env if APP_ENV is defined
-if (!isset($_SERVER['APP_ENV']) && !isset($_ENV['APP_ENV'])) {
-    if (!class_exists(Dotenv::class)) {
-        throw new \RuntimeException('APP_ENV environment variable is not defined. You need to define environment variables for configuration or add "symfony/dotenv" as a Composer dependency to load variables from a .env file.');
+    if (!EnvironmentHelper::getVariable('SHOPWARE_SKIP_WEBINSTALLER', false) && !file_exists(dirname(__DIR__) . '/install.lock')) {
+        $baseURL = str_replace(basename(__FILE__), '', $_SERVER['SCRIPT_NAME']);
+        $baseURL = rtrim($baseURL, '/');
+
+        if (strpos($_SERVER['REQUEST_URI'], '/installer') === false) {
+            header('Location: ' . $baseURL . '/installer');
+            exit;
+        }
     }
-    (new Dotenv())->usePutenv()->load(__DIR__ . '/../.env');
-}
 
-$appEnv = $_SERVER['APP_ENV'] ?? $_ENV['APP_ENV'] ?? 'dev';
-$debug = (bool) ($_SERVER['APP_DEBUG'] ?? $_ENV['APP_DEBUG'] ?? ($appEnv !== 'prod'));
+    $appEnv = $context['APP_ENV'] ?? 'dev';
+    $debug = (bool) ($context['APP_DEBUG'] ?? ($appEnv !== 'prod'));
 
-if ($debug) {
-    umask(0000);
+    if (!EnvironmentHelper::getVariable('SHOPWARE_SKIP_WEBINSTALLER', false) && !file_exists(dirname(__DIR__) . '/install.lock')) {
+        return new InstallerKernel($appEnv, $debug);
+    }
 
-    Debug::enable();
-}
+    $pluginLoader = null;
 
-$trustedProxies = $_SERVER['TRUSTED_PROXIES'] ?? $_ENV['TRUSTED_PROXIES'] ?? false;
-if ($trustedProxies) {
-    Request::setTrustedProxies(explode(',', $trustedProxies), Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PORT | Request::HEADER_X_FORWARDED_PROTO);
-}
+    if (EnvironmentHelper::getVariable('COMPOSER_PLUGIN_LOADER', false)) {
+        $pluginLoader = new ComposerPluginLoader($classLoader, null);
+    }
 
-$trustedHosts = $_SERVER['TRUSTED_HOSTS'] ?? $_ENV['TRUSTED_HOSTS'] ?? false;
-if ($trustedHosts) {
-    Request::setTrustedHosts(explode(',', $trustedHosts));
-}
-
-$request = Request::createFromGlobals();
-
-$kernel = new HttpKernel($appEnv, $debug, $classLoader);
-
-if ($_SERVER['COMPOSER_PLUGIN_LOADER'] ?? $_SERVER['DISABLE_EXTENSIONS'] ?? false) {
-    $kernel->setPluginLoader(new \Shopware\Core\Framework\Plugin\KernelPluginLoader\ComposerPluginLoader($classLoader));
-}
-
-$result = $kernel->handle($request);
-
-$result->getResponse()->send();
-
-$kernel->terminate($result->getRequest(), $result->getResponse());
+    return KernelFactory::create(
+        environment: $appEnv,
+        debug: $debug,
+        classLoader: $classLoader,
+        pluginLoader: $pluginLoader
+    );
+};

@@ -1,0 +1,2 @@
+demo.tgz filter=lfs diff=lfs merge=lfs -text
+demo.sql.gz filter=lfs diff=lfs merge=lfs -text

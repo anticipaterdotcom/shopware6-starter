@@ -54,6 +54,7 @@ chromedriver.log
 
 ###> symfony/framework-bundle ###
 .env
+.env.local
 /public/bundles/
 /var/
 /vendor/
