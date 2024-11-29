@@ -1,11 +1,13 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Redirect thumbnail images
+    # Redirect thumbnail images if the file does not exist
     RewriteCond %{REQUEST_URI} ^/thumbnail/.+_(\d+)x(\d+)\.jpg$
+    RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ https://placebear.com/%1/%2 [R=301,L]
 
-    # Redirect media files
+    # Redirect media files if the file does not exist
     RewriteCond %{REQUEST_URI} ^/media/.+\.(svg|jpg|jpeg|png)$
+    RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ https://placebear.com/400/400 [R=301,L]
 </IfModule>
